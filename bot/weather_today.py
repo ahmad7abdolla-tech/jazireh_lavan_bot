@@ -1,141 +1,84 @@
 import requests
-from datetime import datetime, timedelta
 from persiantools.jdatetime import JalaliDate
-import hijri_converter
-from telegram import Update
-from telegram.ext import ContextTypes
+from datetime import datetime
+from hijri_converter import convert
+from utils.convert_wind import convert_wind_direction
+from utils.weather_advice import generate_daily_advice
+from utils.weather_condition_translate import translate_condition
+from utils.day_name import get_day_name_fa
 
-# مختصات جزیره لاوان
-LAT = 26.7917
-LON = 54.5125
+WEATHER_API_KEY = "5a1b0ee6907845879ff155659250906"
+BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
 
-# کلید API هواشناسی WeatherAPI.com
-API_KEY = "5a1b0ee6907845879ff155659250906"
 
-# تابع پردازش دکمه "هوای لاوان الان چطوره؟"
-async def handle_weather_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        url = f"http://api.weatherapi.com/v1/forecast.json?key={API_KEY}&q={LAT},{LON}&days=6&lang=fa"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-
-        current = data["current"]
-        forecast_days = data["forecast"]["forecastday"]
-
-        # اطلاعات وضعیت فعلی
-        description = current["condition"]["text"]
-        temperature = round(current["temp_c"], 1)
-        humidity = current["humidity"]
-        wind_kph = round(current["wind_kph"], 1)
-        wind_dir_fa = translate_wind_direction(current["wind_dir"])
-        pressure_mb = current["pressure_mb"]
-
-        # تاریخ‌ها
-        now = datetime.utcnow()
-        date_miladi = now.strftime("%Y/%m/%d")
-        date_shamsi = JalaliDate(now).strftime("%Y/%m/%d")
-        date_ghamari = hijri_converter.Gregorian(now.year, now.month, now.day).to_hijri().isoformat()
-
-        # تحلیل روزانه
-        analysis = generate_daily_analysis(temperature, wind_kph / 3.6)  # تبدیل km/h به m/s برای تحلیل
-
-        # ساخت پیام نهایی
-        message = f"""🌤️ وضعیت فعلی هوای لاوان:
-
-✅ توضیح: {description}
-🌡️ دما: {temperature}°C
-💧 رطوبت: {humidity}%
-💨 باد: {wind_kph} km/h ({wind_dir_fa})
-🔽 فشار هوا: {pressure_mb} hPa
-
-──────────────
-
-📆 تاریخ:
-🔹 شمسی: {date_shamsi}
-🔹 قمری: {date_ghamari}
-🔹 میلادی: {date_miladi}
-
-──────────────
-
-🧭 تحلیل روزانه:
-{analysis}
-
-──────────────
-
-📈 پیش‌بینی پنج روز آینده:"""
-
-        # پیش بینی از روز بعد شروع می‌شود (رد کردن اولین روز که امروز است)
-        for day in forecast_days[1:6]:
-            date_jalali = JalaliDate(datetime.strptime(day["date"], "%Y-%m-%d")).strftime("%Y/%m/%d")
-            weekday_fa = get_persian_weekday(datetime.strptime(day["date"], "%Y-%m-%d").weekday())
-            desc = day["day"]["condition"]["text"]
-            max_temp = round(day["day"]["maxtemp_c"], 1)
-            min_temp = round(day["day"]["mintemp_c"], 1)
-            humidity_day = day["day"]["avghumidity"]
-            wind_day_kph = round(day["day"]["maxwind_kph"], 1)
-            rain_mm = day["day"]["totalprecip_mm"]
-
-            message += f"""
-🔹 {date_jalali} ({weekday_fa}) – {desc}
-   • 🌡️ بیشینه دما: {max_temp}°C، کمینه دما: {min_temp}°C
-   • 💧 رطوبت: {humidity_day}%
-   • 💨 سرعت باد: {wind_day_kph} km/h
-   • ☔ بارندگی: {rain_mm} mm"""
-
-        await update.message.reply_text(message)
-
-    except Exception as e:
-        await update.message.reply_text(f"خطا در دریافت اطلاعات هواشناسی: {e}")
-
-def translate_wind_direction(direction_en: str) -> str:
-    mapping = {
-        "N": "شمال",
-        "NNE": "شمال‌شرق",
-        "NE": "شمال‌شرق",
-        "ENE": "شمال‌شرق",
-        "E": "شرق",
-        "ESE": "جنوب‌شرق",
-        "SE": "جنوب‌شرق",
-        "SSE": "جنوب‌شرق",
-        "S": "جنوب",
-        "SSW": "جنوب‌غرب",
-        "SW": "جنوب‌غرب",
-        "WSW": "جنوب‌غرب",
-        "W": "غرب",
-        "WNW": "شمال‌غرب",
-        "NW": "شمال‌غرب",
-        "NNW": "شمال‌غرب"
+def get_weather_forecast():
+    params = {
+        "key": WEATHER_API_KEY,
+        "q": "Lavan Island",
+        "days": 6,
+        "lang": "en",
+        "aqi": "no",
+        "alerts": "no"
     }
-    return mapping.get(direction_en, direction_en)
+    response = requests.get(BASE_URL, params=params)
+    data = response.json()
 
-def get_persian_weekday(weekday_index: int) -> str:
-    weekdays = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
-    # توجه: در پایتون، دوشنبه=0، یکشنبه=6؛ اینجا ترتیب را بر اساس نیاز فارسی تنظیم کردیم
-    return weekdays[weekday_index % 7]
+    current = data["current"]
+    forecast_days = data["forecast"]["forecastday"]
 
-def generate_daily_analysis(temp_c: float, wind_mps: float) -> str:
-    result = ""
+    today = datetime.today()
+    today_jalali = JalaliDate.today()
+    today_hijri = convert.Gregorian(today.year, today.month, today.day).to_hijri()
 
-    # ✈️ سفر
-    result += "• ✈️ سفر به لاوان: شرایط عمومی هوا مناسب است.\n"
+    condition_text = translate_condition(current["condition"]["text"])
+    wind_dir_fa = convert_wind_direction(current["wind_dir"])
 
-    # 🌊 دریا
-    if wind_mps <= 5:
-        result += "• 🌊 دریا و ماهی‌گیری: وضعیت دریا آرام و مناسب است.\n"
-    else:
-        result += "• 🌊 دریا و ماهی‌گیری: وزش باد نسبتاً شدید است؛ احتیاط شود.\n"
+    message = f"🌤️ وضعیت فعلی هوای لاوان:\n\n"
+    message += f"✅ توضیح: {condition_text}\n"
+    message += f"🌡️ دما: {current['temp_c']}°C\n"
+    message += f"💧 رطوبت: {current['humidity']}%\n"
+    message += f"💨 باد: {current['wind_kph']} km/h ({wind_dir_fa})\n"
+    message += f"🔽 فشار هوا: {current['pressure_mb']} hPa\n"
 
-    # 🤸‍♂️ ورزش
-    if temp_c >= 35:
-        result += "• 🤸‍♂️ ورزش در فضای باز: دما بالاست، فعالیت سنگین توصیه نمی‌شود.\n"
-    else:
-        result += "• 🤸‍♂️ ورزش در فضای باز: شرایط مناسب برای فعالیت فیزیکی.\n"
+    message += "\n──────────────\n\n"
 
-    # 🏝️ تفریح
-    if temp_c >= 34:
-        result += "• 🏝️ گردش و تفریح: در مناطق بدون سایه، استفاده از کلاه و کرم ضدآفتاب توصیه می‌شود."
-    else:
-        result += "• 🏝️ گردش و تفریح: هوای دلپذیر برای گشت‌وگذار در فضای باز."
+    message += f"📆 تاریخ:\n"
+    message += f"🔹 شمسی: {today_jalali}\n"
+    message += f"🔹 قمری: {today_hijri}\n"
+    message += f"🔹 میلادی: {today.strftime('%Y/%m/%d')}\n"
 
-    return result
+    message += "\n──────────────\n\n"
+
+    message += "🧭 تحلیل روزانه:\n"
+    message += generate_daily_advice(current)
+
+    message += "\n──────────────\n\n"
+
+    message += "📈 پیش‌بینی پنج روز آینده:\n"
+    for i in range(1, 6):
+        forecast = forecast_days[i]
+        date_obj = datetime.strptime(forecast['date'], "%Y-%m-%d")
+        jalali_date = JalaliDate(date_obj)
+        day_name_fa = get_day_name_fa(date_obj.weekday())
+
+        condition = translate_condition(forecast['day']['condition']['text'])
+        max_temp = forecast['day']['maxtemp_c']
+        min_temp = forecast['day']['mintemp_c']
+        humidity = forecast['day']['avghumidity']
+        wind_kph = forecast['day']['maxwind_kph']
+        rain_mm = forecast['day']['totalprecip_mm']
+
+        message += f"🔹 {jalali_date} ({day_name_fa}) – {condition}\n"
+        message += f"   • 🌡️ بیشینه دما: {max_temp}°C، کمینه دما: {min_temp}°C\n"
+        message += f"   • 💧 رطوبت: {humidity}%\n"
+        message += f"   • 💨 سرعت باد: {wind_kph} km/h\n"
+        message += f"   • ☔ بارندگی: {rain_mm} mm\n"
+
+    return message
+
+
+def handle_weather_today():
+    try:
+        return get_weather_forecast()
+    except Exception as e:
+        return f"خطا در دریافت اطلاعات هواشناسی: {str(e)}"
