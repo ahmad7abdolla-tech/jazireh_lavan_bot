@@ -1,83 +1,94 @@
 import requests
-from datetime import datetime
-from khayyam import JalaliDatetime
-from hijri_converter import convert
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
-API_KEY = "31cd3332815266315f25a40e56962a52"
-LAT, LON = 26.8053, 53.3480
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data="weather_now")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("سلام! به ربات جزیره لاوان خوش اومدی 🌴", reply_markup=reply_markup)
+# --- داده نمونه هواشناسی (برای تست) ---
+sample_weather_data = {
+    "current": {
+        "description": "آسمان صاف",
+        "temp": 35.0,
+        "humidity": 49,
+        "wind_speed": 2.37,
+        "wind_dir": "غرب",
+        "pressure": 1005,
+        "date": {
+            "shamsi": "1404/03/20",
+            "qomari": "1446/12/13",
+            "miladi": "2025/06/09"
+        }
+    },
+    "forecast": [
+        {"date": "دوشنبه 1404/03/20", "desc": "آسمان صاف", "temp": 35.0, "humidity": 49, "wind_speed": 2.37, "rain": 0},
+        {"date": "سه شنبه 1404/03/21", "desc": "آسمان صاف", "temp": 31.6, "humidity": 57, "wind_speed": 4.16, "rain": 0},
+        {"date": "چهارشنبه 1404/03/22", "desc": "آسمان صاف", "temp": 32.1, "humidity": 57, "wind_speed": 1.81, "rain": 0},
+        {"date": "پنجشنبه 1404/03/23", "desc": "آسمان صاف", "temp": 31.4, "humidity": 58, "wind_speed": 3.43, "rain": 0},
+        {"date": "جمعه 1404/03/24", "desc": "آسمان صاف", "temp": 31.3, "humidity": 66, "wind_speed": 6.24, "rain": 0},
+    ]
+}
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+def prepare_weather_message(data):
+    cur = data["current"]
+    fcs = data["forecast"]
 
-    if query.data == "weather_now":
-        weather_data = requests.get(
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=fa"
-        ).json()
+    msg = (
+        f"🌤️ وضعیت فعلی هوای لاوان:\n\n"
+        f"✅ توضیح: {cur['description']}\n"
+        f"🌡️ دما: {cur['temp']}°C\n"
+        f"💧 رطوبت: {cur['humidity']}%\n"
+        f"💨 باد: {cur['wind_speed']} m/s ({cur['wind_dir']})\n"
+        f"🔽 فشار هوا: {cur['pressure']} hPa\n\n"
+        f"──────────────\n\n"
+        f"📆 تاریخ:\n"
+        f"🔹 شمسی: {cur['date']['shamsi']}\n"
+        f"🔹 قمری: {cur['date']['qomari']}\n"
+        f"🔹 میلادی: {cur['date']['miladi']}\n\n"
+        f"──────────────\n\n"
+        f"📈 پیش‌بینی پنج روز آینده:\n"
+    )
 
-        current = weather_data["list"][0]
-        description = current["weather"][0]["description"]
-        temp = current["main"]["temp"]
-        humidity = current["main"]["humidity"]
-        wind_speed = current["wind"]["speed"]
-        pressure = current["main"]["pressure"]
-        wind_dir = current["wind"].get("deg", 0)
+    for day in fcs:
+        msg += (
+            f"🔹 {day['date']} – {day['desc']}\n"
+            f"   • 🌡️ دما: {day['temp']}°C\n"
+            f"   • 💧 رطوبت: {day['humidity']}%\n"
+            f"   • 💨 سرعت باد: {day['wind_speed']} m/s\n"
+            f"   • ☔ بارندگی: {day['rain']} mm\n\n"
+        )
+    return msg.strip()
 
-        wind_direction = get_wind_direction(wind_dir)
 
-        today = datetime.utcnow()
-        jalali = JalaliDatetime(today).strftime("%Y/%m/%d")
-        hijri = convert.Gregorian(today.year, today.month, today.day).to_hijri().isoformat()
-        miladi = today.strftime("%Y/%m/%d")
+def send_telegram_message(chat_id, text):
+    url = f"{TELEGRAM_API_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown"
+    }
+    r = requests.post(url, data=payload)
+    return r.json()
 
-        message = f"""🌤️ *وضعیت فعلی هوای لاوان:*
 
-✅ توضیح: {description.capitalize()}
-🌡️ دما: {temp:.1f}°C
-💧 رطوبت: {humidity}%
-💨 باد: {wind_speed} m/s ({wind_direction})
-🔽 فشار هوا: {pressure} hPa
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    update = request.get_json()
 
-──────────────
+    if "message" in update:
+        message = update["message"]
+        chat_id = message["chat"]["id"]
+        text = message.get("text", "")
 
-📆 *تاریخ:*
-🔹 شمسی: {jalali}
-🔹 قمری: {hijri}
-🔹 میلادی: {miladi}
+        if text == "🌦️ هوای لاوان الان چطوره؟":
+            weather_message = prepare_weather_message(sample_weather_data)
+            send_telegram_message(chat_id, weather_message)
+        else:
+            send_telegram_message(chat_id, "سلام! لطفاً یکی از دکمه‌های موجود را انتخاب کنید.")
 
-──────────────
+    return jsonify({"ok": True})
 
-📈 *پیش‌بینی هفت روز آینده:*
-"""     
-        forecast_text = ""
-        for item in weather_data["list"][:7*8:8]:
-            date = datetime.utcfromtimestamp(item["dt"])
-            day_jalali = JalaliDatetime(date).strftime("%A %Y/%m/%d")
-            desc = item["weather"][0]["description"].capitalize()
-            t = item["main"]["temp"]
-            h = item["main"]["humidity"]
-            w = item["wind"]["speed"]
-            forecast_text += f"\n🔹 *{day_jalali} – {desc}*\n   • 🌡️ دما: {t:.1f}°C\n   • 💧 رطوبت: {h}%\n   • 💨 سرعت باد: {w} m/s\n   • ☔ بارندگی: 0 mm\n\n"
-
-        message += forecast_text.strip()
-        await query.edit_message_text(message, parse_mode="Markdown")
-
-def get_wind_direction(degree):
-    dirs = ["شمال", "شمال‌شرق", "شرق", "جنوب‌شرق", "جنوب", "جنوب‌غرب", "غرب", "شمال‌غرب"]
-    ix = round(degree / 45) % 8
-    return dirs[ix]
 
 if __name__ == "__main__":
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    print("Bot is running...")
-    app.run_polling()
+    app.run(port=8443)
