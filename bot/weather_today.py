@@ -5,50 +5,54 @@ import hijri_converter
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# مختصات جزیره لاوان
+API_KEY = "5a1b0ee6907845879ff155659250906"
 LAT = 26.7917
 LON = 54.5125
 
-# کلید API هواشناسی
-API_KEY = "31cd3332815266315f25a40e56962a52"
-
-# تابع پردازش دکمه "هوای لاوان الان چطوره؟"
 async def handle_weather_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        url = f"https://api.openweathermap.org/data/2.5/onecall?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=fa"
-        response = requests.get(url)
+        url = "http://api.weatherapi.com/v1/forecast.json"
+        params = {
+            "key": API_KEY,
+            "q": f"{LAT},{LON}",
+            "days": 5,
+            "lang": "fa",
+            "aqi": "no",
+            "alerts": "no"
+        }
+
+        response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
 
         current = data["current"]
-        daily = data["daily"]
+        forecast_days = data["forecast"]["forecastday"]
 
         # اطلاعات وضعیت فعلی
-        description = current["weather"][0]["description"].capitalize()
-        temperature = round(current["temp"], 1)
+        condition = current["condition"]["text"]
+        temperature = current["temp_c"]
         humidity = current["humidity"]
-        wind_speed = round(current["wind_speed"], 2)
-        wind_deg = current["wind_deg"]
-        pressure = current["pressure"]
-        wind_dir = get_wind_direction(wind_deg)
+        wind_kph = current["wind_kph"]
+        wind_dir = current["wind_dir"]
+        pressure_mb = current["pressure_mb"]
 
         # تاریخ‌ها
-        now = datetime.utcnow()
+        now = datetime.strptime(current["last_updated"], "%Y-%m-%d %H:%M")
         date_miladi = now.strftime("%Y/%m/%d")
         date_shamsi = JalaliDate(now).strftime("%Y/%m/%d")
         date_ghamari = hijri_converter.Gregorian(now.year, now.month, now.day).to_hijri().isoformat()
 
-        # تحلیل روزانه
-        analysis = generate_daily_analysis(temperature, wind_speed)
+        # تحلیل روزانه (می‌تونیم تغییر بدیم یا نگه داریم)
+        analysis = generate_daily_analysis(temperature, wind_kph)
 
         # ساخت پیام نهایی
         message = f"""🌤️ وضعیت فعلی هوای لاوان:
 
-✅ توضیح: {description}
+✅ توضیح: {condition}
 🌡️ دما: {temperature}°C
 💧 رطوبت: {humidity}%
-💨 باد: {wind_speed} m/s ({wind_dir})
-🔽 فشار هوا: {pressure} hPa
+💨 باد: {wind_kph} km/h ({wind_dir})
+🔽 فشار هوا: {pressure_mb} hPa
 
 ──────────────
 
@@ -66,22 +70,22 @@ async def handle_weather_today(update: Update, context: ContextTypes.DEFAULT_TYP
 
 📈 پیش‌بینی پنج روز آینده:"""
 
-        # افزودن پیش‌بینی پنج روز آینده
-        for day in daily[:5]:
-            dt = datetime.utcfromtimestamp(day["dt"])
-            date_sh = JalaliDate(dt).strftime("%Y/%m/%d")
-            desc = day["weather"][0]["description"].capitalize()
-            temp_day = round(day["temp"]["day"], 1)
-            hum = day["humidity"]
-            wind = round(day["wind_speed"], 2)
-            rain = day.get("rain", 0)
+        for day in forecast_days:
+            date_obj = datetime.strptime(day["date"], "%Y-%m-%d")
+            date_sh = JalaliDate(date_obj).strftime("%Y/%m/%d")
+            day_condition = day["day"]["condition"]["text"]
+            max_temp = day["day"]["maxtemp_c"]
+            min_temp = day["day"]["mintemp_c"]
+            humidity = day["day"]["avghumidity"]
+            wind_kph = day["day"]["maxwind_kph"]
+            rain_mm = day["day"]["totalprecip_mm"]
 
             message += f"""
-🔹 {date_sh} – {desc}
-   • 🌡️ دما: {temp_day}°C
-   • 💧 رطوبت: {hum}%
-   • 💨 سرعت باد: {wind} m/s
-   • ☔ بارندگی: {rain} mm"""
+🔹 {date_sh} – {day_condition}
+   • 🌡️ بیشینه دما: {max_temp}°C، کمینه دما: {min_temp}°C
+   • 💧 رطوبت متوسط: {humidity}%
+   • 💨 سرعت باد: {wind_kph} km/h
+   • ☔ بارندگی: {rain_mm} mm"""
 
         await update.message.reply_text(message)
 
@@ -89,22 +93,14 @@ async def handle_weather_today(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(f"خطا در دریافت اطلاعات هواشناسی: {e}")
 
 
-def get_wind_direction(degrees: int) -> str:
-    dirs = [
-        "شمال", "شمال‌شرق", "شرق", "جنوب‌شرق",
-        "جنوب", "جنوب‌غرب", "غرب", "شمال‌غرب"
-    ]
-    idx = int((degrees + 22.5) / 45) % 8
-    return dirs[idx]
-
-def generate_daily_analysis(temp: float, wind: float) -> str:
+def generate_daily_analysis(temp: float, wind_kph: float) -> str:
     result = ""
 
     # ✈️ سفر
     result += "• ✈️ سفر به لاوان: شرایط عمومی هوا مناسب است.\n"
 
     # 🌊 دریا
-    if wind <= 5:
+    if wind_kph <= 20:
         result += "• 🌊 دریا و ماهی‌گیری: وضعیت دریا آرام و مناسب است.\n"
     else:
         result += "• 🌊 دریا و ماهی‌گیری: وزش باد نسبتاً شدید است؛ احتیاط شود.\n"
