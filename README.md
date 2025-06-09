@@ -12,3 +12,7 @@
 
 ## وضعیت پروژه
 در حال توسعه (مرحله به مرحله)
+
+git add .
+git commit -m "🧪 تست GitHub Actions"
+git push origin main
