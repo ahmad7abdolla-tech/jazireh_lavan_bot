@@ -3,3 +3,4 @@ requests
 persiantools
 khayyam
 hijri-converter
+python-telegram-bot
