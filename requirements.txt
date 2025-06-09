@@ -1,1 +1,4 @@
 python-telegram-bot==20.6
+requests
+khayyam
+hijri-converter
