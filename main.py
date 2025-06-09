@@ -1,51 +1,42 @@
-# main.py
-
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from bot.weather_today import handle_weather_today
 
-# توکن ربات شما (در حافظه ذخیره شده)
+# توکن ربات
 BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
 
-# فعال کردن لاگ
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+# دکمه‌های منو اصلی
+main_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        ["🌦️ هوای لاوان الان چطوره؟"]
+    ],
+    resize_keyboard=True
 )
-logger = logging.getLogger(__name__)
 
-# دکمه‌های منوی اصلی
-def get_main_menu():
-    keyboard = [
-        [InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data="weather_today")],
-        # دکمه‌های آینده اینجا اضافه می‌شن
-    ]
-    return InlineKeyboardMarkup(keyboard)
+# شروع به کار ربات
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "سلام! به ربات جزیره لاوان خوش اومدی 🌴\nیکی از گزینه‌ها رو انتخاب کن:",
+        reply_markup=main_keyboard
+    )
 
-# دستور /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("به ربات جزیره لاوان خوش آمدید 🌴", reply_markup=get_main_menu())
+# مدیریت کلی پیام‌ها
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-# مدیریت دکمه‌ها
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "weather_today":
+    if text == "🌦️ هوای لاوان الان چطوره؟":
         await handle_weather_today(update, context)
     else:
-        await query.edit_message_text("این گزینه هنوز پشتیبانی نمی‌شود.")
+        await update.message.reply_text("دستور ناشناخته است. لطفاً از دکمه‌ها استفاده کن.")
 
-# راه‌اندازی ربات
+# اجرای ربات
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("ربات فعال شد ✅")
     app.run_polling()
 
 if __name__ == "__main__":
