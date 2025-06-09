@@ -1,34 +1,51 @@
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-from weather_today import handle_weather_today
+# main.py
 
-# توکن ربات
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
+from bot.weather_today import handle_weather_today
+
+# توکن ربات شما (در حافظه ذخیره شده)
 BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
 
-# کیبورد اصلی
-main_keyboard = ReplyKeyboardMarkup(
-    [["🌦️ هوای لاوان الان چطوره؟"]],
-    resize_keyboard=True
+# فعال کردن لاگ
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+logger = logging.getLogger(__name__)
+
+# دکمه‌های منوی اصلی
+def get_main_menu():
+    keyboard = [
+        [InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data="weather_today")],
+        # دکمه‌های آینده اینجا اضافه می‌شن
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 # دستور /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! به ربات جزیره لاوان خوش آمدید 👋", reply_markup=main_keyboard)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("به ربات جزیره لاوان خوش آمدید 🌴", reply_markup=get_main_menu())
 
-# مدیریت پیام‌های متنی
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+# مدیریت دکمه‌ها
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
 
-    if text == "🌦️ هوای لاوان الان چطوره؟":
+    if query.data == "weather_today":
         await handle_weather_today(update, context)
     else:
-        await update.message.reply_text("دستور نامعتبر است. لطفاً یکی از دکمه‌ها را انتخاب کنید.")
+        await query.edit_message_text("این گزینه هنوز پشتیبانی نمی‌شود.")
 
-# راه‌اندازی برنامه
+# راه‌اندازی ربات
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.run_polling()
 
 if __name__ == "__main__":
