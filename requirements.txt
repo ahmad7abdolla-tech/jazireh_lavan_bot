@@ -1,4 +1,5 @@
 python-telegram-bot==20.6
 requests
+persiantools
 khayyam
 hijri-converter
