@@ -2,14 +2,78 @@ import requests
 from persiantools.jdatetime import JalaliDate
 from datetime import datetime
 from hijri_converter import convert
-from utils.convert_wind import convert_wind_direction
-from utils.weather_advice import generate_daily_advice
-from utils.weather_condition_translate import translate_condition
-from utils.day_name import get_day_name_fa
 
+# --- تابع تبدیل جهت باد به فارسی ---
+def convert_wind_direction(direction):
+    mapping = {
+        "N": "شمال", "NE": "شمال‌شرق", "E": "شرق", "SE": "جنوب‌شرق",
+        "S": "جنوب", "SW": "جنوب‌غرب", "W": "غرب", "NW": "شمال‌غرب",
+        "NNE": "شمال شمال‌شرق", "ENE": "شرق شمال‌شرق", "ESE": "شرق جنوب‌شرق",
+        "SSE": "جنوب جنوب‌شرق", "SSW": "جنوب جنوب‌غرب", "WSW": "غرب جنوب‌غرب",
+        "WNW": "غرب شمال‌غرب", "NNW": "شمال شمال‌غرب"
+    }
+    return mapping.get(direction, direction)
+
+# --- تابع ترجمه وضعیت آب‌وهوا به فارسی ---
+def translate_condition(condition):
+    translations = {
+        "Sunny": "آفتابی",
+        "Clear": "صاف",
+        "Partly cloudy": "نیمه‌ابری",
+        "Cloudy": "ابری",
+        "Overcast": "تمام‌ابری",
+        "Mist": "مه",
+        "Patchy rain possible": "احتمال بارش پراکنده",
+        "Light rain": "باران سبک",
+        "Moderate rain": "باران متوسط",
+        "Heavy rain": "باران شدید",
+        "Thunderstorm": "طوفان رعدوبرق",
+        # موارد دیگر در صورت نیاز اضافه شود
+    }
+    return translations.get(condition, condition)
+
+# --- تابع تبدیل شماره هفته به نام فارسی ---
+def get_day_name_fa(weekday_number):
+    names = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
+    return names[weekday_number % 7]
+
+# --- تابع تحلیل روزانه ---
+def generate_daily_advice(current):
+    advice = ""
+    temp = current["temp_c"]
+    wind = current["wind_kph"]
+    condition = current["condition"]["text"]
+    humidity = current["humidity"]
+
+    # ✈️ سفر به لاوان
+    if temp >= 15 and temp <= 40 and "rain" not in condition.lower():
+        advice += "• ✈️ سفر به لاوان: شرایط عمومی هوا مناسب است.\n"
+    else:
+        advice += "• ✈️ سفر به لاوان: شرایط سفر ممکن است چالش‌برانگیز باشد.\n"
+
+    # 🌊 دریا و ماهی‌گیری
+    if wind <= 20:
+        advice += "• 🌊 دریا و ماهی‌گیری: وضعیت دریا آرام و مناسب است.\n"
+    else:
+        advice += "• 🌊 دریا و ماهی‌گیری: احتمال مواج بودن دریا وجود دارد.\n"
+
+    # 🤸‍♂️ ورزش در فضای باز
+    if humidity < 70 and temp <= 35:
+        advice += "• 🤸‍♂️ ورزش در فضای باز: شرایط مناسب برای فعالیت فیزیکی.\n"
+    else:
+        advice += "• 🤸‍♂️ ورزش در فضای باز: توصیه به احتیاط در انجام فعالیت‌ها.\n"
+
+    # 🏝️ گردش و تفریح
+    if "rain" not in condition.lower() and temp <= 38:
+        advice += "• 🏝️ گردش و تفریح: هوای دلپذیر برای گشت‌وگذار در فضای باز.\n"
+    else:
+        advice += "• 🏝️ گردش و تفریح: بهتر است برنامه تفریحی را با احتیاط تنظیم کنید.\n"
+
+    return advice
+
+# --- دریافت اطلاعات آب‌وهوا ---
 WEATHER_API_KEY = "5a1b0ee6907845879ff155659250906"
 BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
-
 
 def get_weather_forecast():
     params = {
@@ -76,7 +140,7 @@ def get_weather_forecast():
 
     return message
 
-
+# --- هندلر نهایی ---
 def handle_weather_today():
     try:
         return get_weather_forecast()
