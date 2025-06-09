@@ -1,94 +1,126 @@
+import logging
 import requests
-from flask import Flask, request, jsonify
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from datetime import datetime
+from persiantools.jdatetime import JalaliDate
+from hijri_converter import Gregorian
 
-app = Flask(__name__)
+# توکن ربات و کلید API هواشناسی (از شما دریافت شده)
+TELEGRAM_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
+OPENWEATHER_API_KEY = "31cd3332815266315f25a40e56962a52"
 
-BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+# تنظیمات لاگ
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-# --- داده نمونه هواشناسی (برای تست) ---
-sample_weather_data = {
-    "current": {
-        "description": "آسمان صاف",
-        "temp": 35.0,
-        "humidity": 49,
-        "wind_speed": 2.37,
-        "wind_dir": "غرب",
-        "pressure": 1005,
-        "date": {
-            "shamsi": "1404/03/20",
-            "qomari": "1446/12/13",
-            "miladi": "2025/06/09"
-        }
-    },
-    "forecast": [
-        {"date": "دوشنبه 1404/03/20", "desc": "آسمان صاف", "temp": 35.0, "humidity": 49, "wind_speed": 2.37, "rain": 0},
-        {"date": "سه شنبه 1404/03/21", "desc": "آسمان صاف", "temp": 31.6, "humidity": 57, "wind_speed": 4.16, "rain": 0},
-        {"date": "چهارشنبه 1404/03/22", "desc": "آسمان صاف", "temp": 32.1, "humidity": 57, "wind_speed": 1.81, "rain": 0},
-        {"date": "پنجشنبه 1404/03/23", "desc": "آسمان صاف", "temp": 31.4, "humidity": 58, "wind_speed": 3.43, "rain": 0},
-        {"date": "جمعه 1404/03/24", "desc": "آسمان صاف", "temp": 31.3, "humidity": 66, "wind_speed": 6.24, "rain": 0},
-    ]
-}
+# مختصات جزیره لاوان
+LAT = 26.7917
+LON = 54.5125
 
-def prepare_weather_message(data):
-    cur = data["current"]
-    fcs = data["forecast"]
+def get_weather():
+    url = f"https://api.openweathermap.org/data/2.5/onecall?lat={LAT}&lon={LON}&appid={OPENWEATHER_API_KEY}&units=metric&lang=fa"
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()
 
-    msg = (
+def format_date():
+    now = datetime.now()
+    # تاریخ شمسی
+    persian_date = JalaliDate(now)
+    persian_str = persian_date.strftime("%Y/%m/%d")
+    # تاریخ قمری
+    hijri_date = Gregorian(now.year, now.month, now.day).to_hijri()
+    hijri_str = f"{hijri_date.year}-{hijri_date.month:02d}-{hijri_date.day:02d}"
+    # تاریخ میلادی
+    gregorian_str = now.strftime("%Y/%m/%d")
+    return persian_str, hijri_str, gregorian_str
+
+def wind_direction(deg):
+    directions = ['شمال', 'شمال‌شرقی', 'شرق', 'جنوب‌شرقی', 'جنوب', 'جنوب‌غربی', 'غرب', 'شمال‌غربی']
+    idx = int((deg + 22.5) // 45) % 8
+    return directions[idx]
+
+def build_weather_message(data):
+    current = data['current']
+    persian_date, hijri_date, gregorian_date = format_date()
+
+    weather_desc = current['weather'][0]['description'].capitalize()
+    temp = current['temp']
+    humidity = current['humidity']
+    wind_speed = current['wind_speed']
+    wind_deg = current.get('wind_deg', 0)
+    pressure = current['pressure']
+
+    wind_dir = wind_direction(wind_deg)
+
+    # پیش‌بینی پنج روز آینده
+    daily = data['daily'][:5]
+    forecast_lines = []
+    for day in daily:
+        dt = datetime.fromtimestamp(day['dt'])
+        persian_day = JalaliDate(dt).strftime("%Y/%m/%d")
+        day_name = persian_day  # می‌توان نام روز هفته هم اضافه کرد ولی ساده می‌گذاریم فعلا
+        desc = day['weather'][0]['description'].capitalize()
+        temp_day = day['temp']['day']
+        humidity_day = day['humidity']
+        wind_day = day['wind_speed']
+        rain = day.get('rain', 0)
+        line = (
+            f"🔹 {persian_day} – {desc}\n"
+            f"   • 🌡️ دما: {temp_day:.1f}°C\n"
+            f"   • 💧 رطوبت: {humidity_day}%\n"
+            f"   • 💨 سرعت باد: {wind_day:.2f} m/s\n"
+            f"   • ☔ بارندگی: {rain} mm"
+        )
+        forecast_lines.append(line)
+
+    forecast_text = "\n\n".join(forecast_lines)
+
+    message = (
         f"🌤️ وضعیت فعلی هوای لاوان:\n\n"
-        f"✅ توضیح: {cur['description']}\n"
-        f"🌡️ دما: {cur['temp']}°C\n"
-        f"💧 رطوبت: {cur['humidity']}%\n"
-        f"💨 باد: {cur['wind_speed']} m/s ({cur['wind_dir']})\n"
-        f"🔽 فشار هوا: {cur['pressure']} hPa\n\n"
+        f"✅ توضیح: {weather_desc}\n"
+        f"🌡️ دما: {temp:.2f}°C\n"
+        f"💧 رطوبت: {humidity}%\n"
+        f"💨 باد: {wind_speed:.2f} m/s ({wind_dir})\n"
+        f"🔽 فشار هوا: {pressure} hPa\n\n"
         f"──────────────\n\n"
         f"📆 تاریخ:\n"
-        f"🔹 شمسی: {cur['date']['shamsi']}\n"
-        f"🔹 قمری: {cur['date']['qomari']}\n"
-        f"🔹 میلادی: {cur['date']['miladi']}\n\n"
+        f"🔹 شمسی: {persian_date}\n"
+        f"🔹 قمری: {hijri_date}\n"
+        f"🔹 میلادی: {gregorian_date}\n\n"
         f"──────────────\n\n"
         f"📈 پیش‌بینی پنج روز آینده:\n"
+        f"{forecast_text}"
     )
+    return message
 
-    for day in fcs:
-        msg += (
-            f"🔹 {day['date']} – {day['desc']}\n"
-            f"   • 🌡️ دما: {day['temp']}°C\n"
-            f"   • 💧 رطوبت: {day['humidity']}%\n"
-            f"   • 💨 سرعت باد: {day['wind_speed']} m/s\n"
-            f"   • ☔ بارندگی: {day['rain']} mm\n\n"
-        )
-    return msg.strip()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data='weather')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("سلام! من ربات اطلاعات جزیره لاوان هستم. یکی از گزینه‌ها را انتخاب کنید:", reply_markup=reply_markup)
 
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-def send_telegram_message(chat_id, text):
-    url = f"{TELEGRAM_API_URL}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
-    }
-    r = requests.post(url, data=payload)
-    return r.json()
+    if query.data == 'weather':
+        try:
+            data = get_weather()
+            message = build_weather_message(data)
+            await query.edit_message_text(text=message, parse_mode='Markdown')
+        except Exception as e:
+            await query.edit_message_text(text=f"خطا در دریافت اطلاعات هواشناسی: {e}")
 
+def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button))
+    app.run_polling()
 
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    update = request.get_json()
-
-    if "message" in update:
-        message = update["message"]
-        chat_id = message["chat"]["id"]
-        text = message.get("text", "")
-
-        if text == "🌦️ هوای لاوان الان چطوره؟":
-            weather_message = prepare_weather_message(sample_weather_data)
-            send_telegram_message(chat_id, weather_message)
-        else:
-            send_telegram_message(chat_id, "سلام! لطفاً یکی از دکمه‌های موجود را انتخاب کنید.")
-
-    return jsonify({"ok": True})
-
-
-if __name__ == "__main__":
-    app.run(port=8443)
+if __name__ == '__main__':
+    main()
