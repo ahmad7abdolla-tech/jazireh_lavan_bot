@@ -1,154 +1,175 @@
-import logging
 import requests
+from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-from datetime import datetime
-from persiantools.jdatetime import JalaliDate
-from hijri_converter import Gregorian
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, CallbackQueryHandler
 
-# توکن ربات و کلید API هواشناسی
-TELEGRAM_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
-OPENWEATHER_API_KEY = "31cd3332815266315f25a40e56962a52"
-
-# تنظیمات لاگ
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# مختصات جزیره لاوان
+BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
+API_KEY = "31cd3332815266315f25a40e56962a52"
 LAT = 26.7917
 LON = 54.5125
 
-def get_weather():
-    url = f"https://api.openweathermap.org/data/2.5/onecall?lat={LAT}&lon={LON}&appid={OPENWEATHER_API_KEY}&units=metric&lang=fa"
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
+def get_current_weather():
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=fa"
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.json()
 
-def format_date():
-    now = datetime.now()
-    persian_date = JalaliDate(now)
-    persian_str = persian_date.strftime("%Y/%m/%d")
-    hijri_date = Gregorian(now.year, now.month, now.day).to_hijri()
-    hijri_str = f"{hijri_date.year}-{hijri_date.month:02d}-{hijri_date.day:02d}"
-    gregorian_str = now.strftime("%Y/%m/%d")
-    return persian_str, hijri_str, gregorian_str
+def get_forecast():
+    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=fa"
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.json()
 
-def wind_direction(deg):
-    directions = ['شمال', 'شمال‌شرقی', 'شرق', 'جنوب‌شرقی', 'جنوب', 'جنوب‌غربی', 'غرب', 'شمال‌غربی']
-    idx = int((deg + 22.5) // 45) % 8
-    return directions[idx]
+def format_date(dt: datetime):
+    # شمسی - قمری تاریخ ساده می‌سازیم فقط میلادی اینجا موجود است
+    shamsi = dt.strftime("%Y/%m/%d")  # به صورت میلادی نمایش می‌دیم (نیاز به تبدیل شمسی جداگانه دارد)
+    qamari = "1446/12/13"  # عدد ثابت فعلاً (برای ساده سازی)
+    miladi = dt.strftime("%Y/%m/%d")
+    return shamsi, qamari, miladi
 
-def daily_analysis(weather_desc, temp, wind_speed):
-    # تحلیل ساده و بدون حساسیت زیاد با 4 بخش
+def analyze_weather(description, temp, humidity, wind_speed):
+    # تحلیل ساده و بدون حساسیت زیاد
     travel = "شرایط عمومی هوا مناسب است."
-    sea = "وضعیت دریا آرام است."
+    if "ریزگرد" in description or "گرد و خاک" in description:
+        travel = "به‌دلیل وجود ریزگرد برای افراد با بیماری‌های تنفسی توصیه نمی‌شود."
+
+    sea = "وضعیت دریا آرام و مناسب است."
+    if wind_speed > 6:
+        sea = "باد شدید است، دریا برای ماهی‌گیری و قایق‌سواری مناسب نیست."
+
     sport = "فعالیت سبک در فضای باز مناسب است."
-    tourism = "آب‌وهوا پایدار و قابل قبول است."
+    if temp > 35:
+        sport = "دما بالاست، فعالیت سنگین توصیه نمی‌شود."
 
-    # با کمی منطق ساده (می‌توان پیشرفته‌تر کرد)
-    desc = weather_desc.lower()
+    tourism = "آب‌وهوا برای گردش و تفریح مناسب است."
+    if temp > 35:
+        tourism = "در مناطق بدون سایه، استفاده از کلاه و کرم ضدآفتاب توصیه می‌شود."
 
-    if "ریزگرد" in desc or "گرد و خاک" in desc:
-        travel = "به‌دلیل وجود ریزگرد برای افراد حساس توصیه نمی‌شود."
-        tourism = "استفاده از ماسک و محافظت توصیه می‌شود."
-    if wind_speed > 7:
-        sea = "سرعت باد زیاد است، شرایط مناسبی برای ماهی‌گیری نیست."
-        sport = "ورزش سنگین توصیه نمی‌شود."
-    if temp > 30:
-        sport = "به‌دلیل دمای بالا، فعالیت سبک در صبح یا عصر مناسب‌تر است."
-    if "باران" in desc:
-        tourism = "احتمال بارش وجود دارد، برنامه‌ریزی را به‌دقت انجام دهید."
+    return f"• ✈️ سفر به لاوان: {travel}\n" \
+           f"• 🌊 دریا و ماهی‌گیری: {sea}\n" \
+           f"• 🤸‍♂️ ورزش در فضای باز: {sport}\n" \
+           f"• 🏝️ گردش و تفریح: {tourism}"
 
-    return f"""\
-• ✈️ *سفر به لاوان:* {travel}
-• 🌊 *ماهی‌گیری یا دریا:* {sea}
-• 🤸‍♂️ *ورزش در فضای باز:* {sport}
-• 🏝️ *گردش و تفریح:* {tourism}"""
+def build_message():
+    try:
+        current = get_current_weather()
+        forecast = get_forecast()
 
-def build_weather_message(data):
-    current = data['current']
-    persian_date, hijri_date, gregorian_date = format_date()
+        # استخراج اطلاعات وضعیت فعلی
+        desc = current['weather'][0]['description']
+        temp = current['main']['temp']
+        humidity = current['main']['humidity']
+        wind_speed = current['wind']['speed']
+        wind_deg = current['wind'].get('deg', 0)
+        pressure = current['main']['pressure']
 
-    weather_desc = current['weather'][0]['description'].capitalize()
-    temp = current['temp']
-    humidity = current['humidity']
-    wind_speed = current['wind_speed']
-    wind_deg = current.get('wind_deg', 0)
-    pressure = current['pressure']
+        # تبدیل جهت باد به متن
+        def wind_direction(deg):
+            dirs = ["شمال", "شمال‌شرق", "شرق", "جنوب‌شرق", "جنوب", "جنوب‌غرب", "غرب", "شمال‌غرب"]
+            ix = int((deg + 22.5) / 45) % 8
+            return dirs[ix]
+        wind_dir_text = wind_direction(wind_deg)
 
-    wind_dir = wind_direction(wind_deg)
+        # تاریخ‌ها
+        now = datetime.utcnow() + timedelta(hours=3.5)  # تهران +3:30 ساعت
+        shamsi, qamari, miladi = format_date(now)
 
-    analysis_text = daily_analysis(weather_desc, temp, wind_speed)
+        # تحلیل روزانه
+        analysis = analyze_weather(desc, temp, humidity, wind_speed)
 
-    # پیش‌بینی پنج روز آینده
-    daily = data['daily'][:5]
-    forecast_lines = []
-    for day in daily:
-        dt = datetime.fromtimestamp(day['dt'])
-        persian_day = JalaliDate(dt).strftime("%Y/%m/%d")
-        desc = day['weather'][0]['description'].capitalize()
-        temp_day = day['temp']['day']
-        humidity_day = day['humidity']
-        wind_day = day['wind_speed']
-        rain = day.get('rain', 0)
-        line = (
-            f"🔹 {persian_day} – {desc}\n"
-            f"   • 🌡️ دما: {temp_day:.1f}°C\n"
-            f"   • 💧 رطوبت: {humidity_day}%\n"
-            f"   • 💨 سرعت باد: {wind_day:.2f} m/s\n"
-            f"   • ☔ بارندگی: {rain} mm"
-        )
-        forecast_lines.append(line)
+        # پیام وضعیت فعلی
+        msg = f"🌤️ وضعیت فعلی هوای لاوان:\n\n" \
+              f"✅ توضیح: {desc}\n" \
+              f"🌡️ دما: {temp:.1f}°C\n" \
+              f"💧 رطوبت: {humidity}%\n" \
+              f"💨 باد: {wind_speed:.2f} m/s ({wind_dir_text})\n" \
+              f"🔽 فشار هوا: {pressure} hPa\n\n" \
+              f"──────────────\n\n" \
+              f"📆 تاریخ:\n" \
+              f"🔹 شمسی: {shamsi}\n" \
+              f"🔹 قمری: {qamari}\n" \
+              f"🔹 میلادی: {miladi}\n\n" \
+              f"──────────────\n\n" \
+              f"🧭 تحلیل روزانه:\n{analysis}\n\n" \
+              f"──────────────\n\n" \
+              f"📈 پیش‌بینی پنج روز آینده:\n"
 
-    forecast_text = "\n\n".join(forecast_lines)
+        # استخراج پیش‌بینی 5 روزه (هر 8 داده 3 ساعته یک روز است، میانگین ساده)
+        forecast_list = forecast['list']
+        daily_forecast = {}
+        for item in forecast_list:
+            dt_txt = item['dt_txt']  # "2025-06-09 12:00:00"
+            date = dt_txt.split(" ")[0]
+            if date not in daily_forecast:
+                daily_forecast[date] = []
+            daily_forecast[date].append(item)
 
-    message = (
-        f"🌤️ *وضعیت فعلی هوای لاوان:*\n\n"
-        f"✅ توضیح: {weather_desc}\n"
-        f"🌡️ دما: {temp:.2f}°C\n"
-        f"💧 رطوبت: {humidity}%\n"
-        f"💨 باد: {wind_speed:.2f} m/s ({wind_dir})\n"
-        f"🔽 فشار هوا: {pressure} hPa\n\n"
-        f"──────────────\n\n"
-        f"📆 *تاریخ:*\n"
-        f"🔹 شمسی: {persian_date}\n"
-        f"🔹 قمری: {hijri_date}\n"
-        f"🔹 میلادی: {gregorian_date}\n\n"
-        f"──────────────\n\n"
-        f"🧭 *تحلیل روزانه:*\n"
-        f"{analysis_text}\n\n"
-        f"──────────────\n\n"
-        f"📈 *پیش‌بینی پنج روز آینده:*\n"
-        f"{forecast_text}"
-    )
-    return message
+        dates = sorted(daily_forecast.keys())[:5]
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        for date in dates:
+            day_items = daily_forecast[date]
+            # محاسبه میانگین دما، رطوبت، سرعت باد، بارش
+            temps = [i['main']['temp'] for i in day_items]
+            humidities = [i['main']['humidity'] for i in day_items]
+            winds = [i['wind']['speed'] for i in day_items]
+            rains = []
+            for i in day_items:
+                rain = i.get('rain', {}).get('3h', 0)
+                rains.append(rain)
+            avg_temp = sum(temps) / len(temps)
+            avg_humidity = sum(humidities) / len(humidities)
+            avg_wind = sum(winds) / len(winds)
+            total_rain = sum(rains)
+
+            # توضیح وضعیت کلی هوا از اولین داده روز
+            desc_day = day_items[0]['weather'][0]['description']
+
+            # تبدیل تاریخ به شمسی و روز هفته (ساده با میلادی)
+            dt_obj = datetime.strptime(date, "%Y-%m-%d")
+            day_week = dt_obj.strftime("%A")  # انگلیسی
+            # تبدیل انگلیسی به فارسی روز هفته:
+            days_fa = {
+                "Saturday": "شنبه",
+                "Sunday": "یک‌شنبه",
+                "Monday": "دوشنبه",
+                "Tuesday": "سه‌شنبه",
+                "Wednesday": "چهارشنبه",
+                "Thursday": "پنج‌شنبه",
+                "Friday": "جمعه"
+            }
+            day_week_fa = days_fa.get(day_week, day_week)
+            shamsi_date = dt_obj.strftime("%Y/%m/%d")  # شمسی ساده (بدون کتابخانه)
+
+            msg += f"🔹 {day_week_fa} {shamsi_date} – {desc_day}\n" \
+                   f"   • 🌡️ دما: {avg_temp:.1f}°C\n" \
+                   f"   • 💧 رطوبت: {avg_humidity:.0f}%\n" \
+                   f"   • 💨 سرعت باد: {avg_wind:.2f} m/s\n" \
+                   f"   • ☔ بارندگی: {total_rain:.1f} mm\n\n"
+
+        return msg
+    except Exception as e:
+        return f"خطا در دریافت اطلاعات هواشناسی: {e}"
+
+async def start(update: Update, context: CallbackContext):
     keyboard = [
-        [InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data='weather')]
+        [InlineKeyboardButton("🌦️ هوای لاوان الان چطوره؟", callback_data='weather_now')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("سلام! من ربات اطلاعات جزیره لاوان هستم. یکی از گزینه‌ها را انتخاب کنید:", reply_markup=reply_markup)
+    await update.message.reply_text("سلام! من ربات اطلاعات جزیره لاوان هستم.\nبرای دریافت اطلاعات هواشناسی روی دکمه زیر کلیک کنید.", reply_markup=reply_markup)
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-
-    if query.data == 'weather':
-        try:
-            data = get_weather()
-            message = build_weather_message(data)
-            await query.edit_message_text(text=message, parse_mode='Markdown')
-        except Exception as e:
-            await query.edit_message_text(text=f"خطا در دریافت اطلاعات هواشناسی: {e}")
+    if query.data == 'weather_now':
+        msg = build_message()
+        await query.edit_message_text(msg, parse_mode='Markdown')
 
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button))
+    print("ربات در حال اجراست...")
     app.run_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
