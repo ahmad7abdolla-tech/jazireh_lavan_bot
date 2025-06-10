@@ -10,7 +10,7 @@ reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 # دستور شروع /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "سلام! 👋 به ربات اطلاعات جزیره لاوان خوش آمدی.\n\nیکی از دکمه‌ها رو انتخاب کن:",
+        "سلام! 👋 \n حیاک الل😉ه به ربات جزیره لاوان خوش آمدی.\n\nیکی از دکمه‌ها رو انتخاب کن:",
         reply_markup=reply_markup
     )
 
