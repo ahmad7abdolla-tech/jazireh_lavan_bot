@@ -19,7 +19,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "هوای لاوان الان چطوره؟":
+    if text == "هوای لاوان الان چطوره؟🌦️":
         await update.message.reply_text("⏳ در حال دریافت اطلاعات هواشناسی...")
         response = handle_weather_today()
         await update.message.reply_text(response)
