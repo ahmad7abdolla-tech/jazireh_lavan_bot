@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 from bot.weather_today import handle_weather_today
 
 
-BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
+BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
 keyboard = [["هوای لاوان الان چطوره؟"]]
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
