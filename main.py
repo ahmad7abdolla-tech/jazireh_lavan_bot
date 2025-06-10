@@ -1,6 +1,10 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from bot.weather_today import handle_weather_today
+from bot.locations.locations_handler import register_handlers
+
+register_handlers(dispatcher)
+
 
 BOT_TOKEN = "7586578372:AAGlPQ7tNVs4-FxaHatLH8oZjSpPOSZzCsM"
 
