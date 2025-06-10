@@ -5,7 +5,7 @@ from bot.weather_today import handle_weather_today
 BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
 keyboard = [
-    ["هوای لاوان الان چطوره؟🌦"],
+    ["🌦هوای لاوان الان چطوره؟"],
     ["📍لوکیشن‌های جزیره لاوان"]  # دکمه جدید
 ]
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -19,7 +19,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "هوای لاوان الان چطوره؟🌦":
+    if text == "🌦هوای لاوان الان چطوره؟":
         await update.message.reply_text("⏳ در حال دریافت اطلاعات هواشناسی...")
         response = handle_weather_today()
         await update.message.reply_text(response)
