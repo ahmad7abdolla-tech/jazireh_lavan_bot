@@ -1,1 +1,13 @@
-
+[
+  {
+    "id": "loc_001",
+    "name": "ساحل لاوان شمالی",
+    "category": "ساحلی",
+    "description": "این ساحل با ماسه‌های سفید و آب شفاف یکی از جذاب‌ترین نقاط جزیره لاوان است.",
+    "images": [
+      "https://drive.google.com/uc?id=EXAMPLE_IMAGE_ID1",
+      "https://drive.google.com/uc?id=EXAMPLE_IMAGE_ID2"
+    ],
+    "keywords": ["ساحل", "دریا", "آرامش", "گردش", "لاوان شمالی"]
+  }
+]
