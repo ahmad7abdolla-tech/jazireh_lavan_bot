@@ -12,7 +12,7 @@ from bot.weather_today import handle_weather_today
 from bot.locations import handle_locations, show_location_details
 from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")  # توی Render باید BOT_TOKEN تعریف بشه
+BOT_TOKEN = os.environ.get("7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac")  # توی Render باید BOT_TOKEN تعریف بشه
 WEBHOOK_URL = f"https://jazireh-lavan-bot.onrender.com/{BOT_TOKEN}"  # آدرس دامنه‌ی رباتت در Render
 
 # کیبورد اصلی ربات
