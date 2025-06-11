@@ -1,8 +1,8 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from bot.weather_today import handle_weather_today
-from bot.locations import handle_locations, show_location_details
-from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
+from bot.locations import handle_locations, show_location_details  # اضافه شده
+from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers  # اضافه شده
 
 BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
@@ -11,7 +11,7 @@ keyboard = [
     ["📍لوکیشن‌های جزیره لاوان"],
     ["🏨معرفی اقامتگاه‌ها و امکانات رفاهی"],
     ["📰اخبار جزیره لاوان"],
-    ["🛠️ پنل مدیریت (ادمین)"]  # دکمه جدید برای ادمین
+    ["🛠️ پنل مدیریت (ادمین)"]  # بدون تغییر
 ]
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -30,7 +30,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(response)
     
     elif text == "📍لوکیشن‌های جزیره لاوان":
-        await handle_locations(update, context)  # فراخوانی ماژول لوکیشن‌ها
+        await handle_locations(update, context)  # تغییر یافته: اکنون ماژول واقعی فراخوانی می‌شود
     
     elif text == "🏨معرفی اقامتگاه‌ها و امکانات رفاهی":
         await update.message.reply_text("در حال توسعه است ⏳")
@@ -39,7 +39,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("در حال توسعه است ⏳")
         
     elif text == "🛠️ پنل مدیریت (ادمین)":
-        await admin_panel(update, context)  # فراخوانی پنل ادمین
+        await admin_panel(update, context)
         
     else:
         await update.message.reply_text("لطفاً از دکمه‌های موجود استفاده کن.")
@@ -47,14 +47,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
-    # هندلرهای اصلی
+    # هندلرهای اصلی (بدون تغییر)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # هندلرهای جدید
+    # هندلرهای جدید اضافه شده
     app.add_handler(CallbackQueryHandler(show_location_details, pattern="^loc_"))
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
-    register_admin_handlers(app)  # ثبت هندلرهای اختصاصی ادمین
+    register_admin_handlers(app)
     
-    print("🤖 ربات با موفقیت اجرا شد. (نسخه ارتقا یافته)")
+    print("🤖 ربات با موفقیت اجرا شد. (نسخه نهایی با قابلیت لوکیشن‌ها)")
     app.run_polling()
