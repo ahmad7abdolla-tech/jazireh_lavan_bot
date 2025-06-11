@@ -72,7 +72,7 @@ def generate_daily_advice(current):
     return advice
 
 # --- دریافت اطلاعات آب‌وهوا ---
-WEATHER_API_KEY = "5a1b0ee6907845879ff155659250906"
+WEATHER_API_KEY = "31cd3332815266315f25a40e56962a52"
 BASE_URL = "http://api.weatherapi.com/v1/forecast.json"
 
 def get_weather_forecast():
