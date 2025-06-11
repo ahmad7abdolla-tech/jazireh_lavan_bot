@@ -1,0 +1,34 @@
+[
+  {
+    "id": "loc001",
+    "name": "ساحل آفتابی",
+    "description": "یکی از زیباترین سواحل جزیره لاوان با شن‌های سفید و آب زلال.",
+    "photos": [
+      "https://example.com/photos/sunny_beach1.jpg",
+      "https://example.com/photos/sunny_beach2.jpg"
+    ],
+    "category": "ساحلی",
+    "keywords": ["ساحل", "آفتابی", "شنا", "تفریح"]
+  },
+  {
+    "id": "loc002",
+    "name": "قلعه تاریخی لاوان",
+    "description": "قلعه‌ای با قدمت چند صد سال که نماد تاریخی جزیره است.",
+    "photos": [
+      "https://example.com/photos/castle1.jpg"
+    ],
+    "category": "تاریخی",
+    "keywords": ["قلعه", "تاریخ", "میراث"]
+  },
+  {
+    "id": "loc003",
+    "name": "پارک جنگلی لاوان",
+    "description": "پارکی با فضای سبز و مسیرهای پیاده‌روی مناسب خانواده‌ها.",
+    "photos": [
+      "https://example.com/photos/forest_park1.jpg",
+      "https://example.com/photos/forest_park2.jpg"
+    ],
+    "category": "تفریحی",
+    "keywords": ["پارک", "جنگل", "طبیعت", "خانواده"]
+  }
+]
