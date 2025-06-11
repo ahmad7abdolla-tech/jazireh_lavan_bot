@@ -1,9 +1,12 @@
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+)
 from bot.weather_today import handle_weather_today
-from bot.locations import handle_locations, show_location_details
+from bot.locations import handle_locations, show_location_details, register_location_handlers
 from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
-from bot.config import BOT_TOKEN
+
+BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
 keyboard = [
     ["🌦 هوای لاوان الان چطوره؟"],
@@ -51,7 +54,9 @@ if __name__ == "__main__":
     
     app.add_handler(CallbackQueryHandler(show_location_details, pattern="^loc_"))
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
-    register_admin_handlers(app)
     
-    print("🤖 ربات با موفقیت اجرا شد. (نسخه نهایی با قابلیت لوکیشن‌ها)")
+    register_admin_handlers(app)
+    register_location_handlers(app)  # ثبت هندلرهای لوکیشن (افزودن لوکیشن)
+    
+    print("🤖 ربات با موفقیت اجرا شد. (نسخه نهایی با قابلیت لوکیشن‌ها و افزودن لوکیشن توسط ادمین)")
     app.run_polling()
