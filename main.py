@@ -3,8 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 from bot.weather_today import handle_weather_today
 from bot.locations import handle_locations, show_location_details
 from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
-
-BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
+from bot.config import BOT_TOKEN
 
 keyboard = [
     ["🌦 هوای لاوان الان چطوره؟"],
