@@ -1,6 +1,8 @@
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from bot.weather_today import handle_weather_today
+from bot.locations import handle_locations, show_location_details
+from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
 
 BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
@@ -8,7 +10,8 @@ keyboard = [
     ["🌦 هوای لاوان الان چطوره؟"],
     ["📍لوکیشن‌های جزیره لاوان"],
     ["🏨معرفی اقامتگاه‌ها و امکانات رفاهی"],
-    ["📰اخبار جزیره لاوان"]  # دکمه جدید اضافه شد
+    ["📰اخبار جزیره لاوان"],
+    ["🛠️ پنل مدیریت (ادمین)"]  # دکمه جدید برای ادمین
 ]
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -27,20 +30,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(response)
     
     elif text == "📍لوکیشن‌های جزیره لاوان":
-        await update.message.reply_text("در حال توسعه است ⏳")
+        await handle_locations(update, context)  # فراخوانی ماژول لوکیشن‌ها
     
     elif text == "🏨معرفی اقامتگاه‌ها و امکانات رفاهی":
         await update.message.reply_text("در حال توسعه است ⏳")
         
-    elif text == "📰اخبار جزیره لاوان":  # پاسخ دکمه جدید
+    elif text == "📰اخبار جزیره لاوان":
         await update.message.reply_text("در حال توسعه است ⏳")
+        
+    elif text == "🛠️ پنل مدیریت (ادمین)":
+        await admin_panel(update, context)  # فراخوانی پنل ادمین
         
     else:
         await update.message.reply_text("لطفاً از دکمه‌های موجود استفاده کن.")
 
-if __name__ == "__main__":  # ✅ صحیح (با دو underline)
+if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # هندلرهای اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 ربات با موفقیت اجرا شد.")
+    
+    # هندلرهای جدید
+    app.add_handler(CallbackQueryHandler(show_location_details, pattern="^loc_"))
+    app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
+    register_admin_handlers(app)  # ثبت هندلرهای اختصاصی ادمین
+    
+    print("🤖 ربات با موفقیت اجرا شد. (نسخه ارتقا یافته)")
     app.run_polling()
