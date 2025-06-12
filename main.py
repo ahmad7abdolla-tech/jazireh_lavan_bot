@@ -72,9 +72,9 @@ if __name__ == "__main__":
     # پنل مدیریت
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
     
-    # ConversationHandler افزودن لوکیشن
+    # ConversationHandler افزودن لوکیشن (اصلاح‌شده)
     add_location_conv = ConversationHandler(
-        entry_points=[CommandHandler("addlocation", add_location_start)],
+        entry_points=[CallbackQueryHandler(add_location_start, pattern="^admin_add_location$")],
         states={
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
             PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     # ConversationHandler ویرایش لوکیشن
     edit_location_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(send_edit_location_list, pattern="admin_edit_location")],
+        entry_points=[CallbackQueryHandler(send_edit_location_list, pattern="^admin_edit_location$")],
         states={
             EDIT_CHOOSE: [CallbackQueryHandler(edit_choose, pattern="^admin_edit_.*|admin_edit_cancel$")],
             EDIT_NAME: [CallbackQueryHandler(edit_field_choose, pattern="^edit_name$")] + [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_name)],
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
     # ConversationHandler حذف لوکیشن
     delete_location_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(send_delete_location_list, pattern="admin_delete_location")],
+        entry_points=[CallbackQueryHandler(send_delete_location_list, pattern="^admin_delete_location$")],
         states={
             DELETE_CHOOSE: [CallbackQueryHandler(delete_choose, pattern="^admin_delete_.*|admin_delete_cancel$")],
             DELETE_CONFIRM: [CallbackQueryHandler(delete_confirm, pattern="^delete_confirm_.*")],
@@ -109,7 +109,6 @@ if __name__ == "__main__":
     app.add_handler(add_location_conv)
     app.add_handler(edit_location_conv)
     app.add_handler(delete_location_conv)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     register_admin_handlers(app)
     register_location_handlers(app)
 
