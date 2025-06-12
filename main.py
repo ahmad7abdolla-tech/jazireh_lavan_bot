@@ -109,6 +109,7 @@ if __name__ == "__main__":
     app.add_handler(add_location_conv)
     app.add_handler(edit_location_conv)
     app.add_handler(delete_location_conv)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     register_admin_handlers(app)
     register_location_handlers(app)
 
