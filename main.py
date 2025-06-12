@@ -1,9 +1,19 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes,
+    filters, CallbackQueryHandler, ConversationHandler
 )
+
 from bot.weather_today import handle_weather_today
-from bot.locations import handle_locations, show_location_details, register_location_handlers
+from bot.locations import (
+    handle_locations, show_location_details, register_location_handlers,
+    add_location_start, add_location_name, add_location_photo, add_location_description, add_location_cancel,
+    send_edit_location_list, edit_choose, edit_field_choose,
+    edit_name, edit_photo, edit_description,
+    send_delete_location_list, delete_choose, delete_confirm,
+    NAME, PHOTO, DESCRIPTION, EDIT_CHOOSE, EDIT_NAME, EDIT_PHOTO, EDIT_DESCRIPTION,
+    DELETE_CHOOSE, DELETE_CONFIRM
+)
 from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
 
 BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
@@ -52,11 +62,51 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
+    # نمایش لوکیشن
     app.add_handler(CallbackQueryHandler(show_location_details, pattern="^loc_"))
+    
+    # پنل مدیریت
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
     
+    # ConversationHandler افزودن لوکیشن
+    add_location_conv = ConversationHandler(
+        entry_points=[CommandHandler("addlocation", add_location_start)],
+        states={
+            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
+            PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
+            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_description)],
+        },
+        fallbacks=[CommandHandler("cancel", add_location_cancel)],
+    )
+
+    # ConversationHandler ویرایش لوکیشن
+    edit_location_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(send_edit_location_list, pattern="admin_edit_location")],
+        states={
+            EDIT_CHOOSE: [CallbackQueryHandler(edit_choose, pattern="^admin_edit_.*|admin_edit_cancel$")],
+            EDIT_NAME: [CallbackQueryHandler(edit_field_choose, pattern="^edit_name$")] + [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_name)],
+            EDIT_PHOTO: [CallbackQueryHandler(edit_field_choose, pattern="^edit_photo$")] + [MessageHandler(filters.PHOTO, edit_photo)],
+            EDIT_DESCRIPTION: [CallbackQueryHandler(edit_field_choose, pattern="^edit_description$")] + [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_description)],
+        },
+        fallbacks=[CommandHandler("cancel", add_location_cancel)],
+    )
+
+    # ConversationHandler حذف لوکیشن
+    delete_location_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(send_delete_location_list, pattern="admin_delete_location")],
+        states={
+            DELETE_CHOOSE: [CallbackQueryHandler(delete_choose, pattern="^admin_delete_.*|admin_delete_cancel$")],
+            DELETE_CONFIRM: [CallbackQueryHandler(delete_confirm, pattern="^delete_confirm_.*")],
+        },
+        fallbacks=[CommandHandler("cancel", add_location_cancel)],
+    )
+
+    # ثبت هندلرها
+    app.add_handler(add_location_conv)
+    app.add_handler(edit_location_conv)
+    app.add_handler(delete_location_conv)
     register_admin_handlers(app)
-    register_location_handlers(app)  # ثبت هندلرهای لوکیشن (افزودن لوکیشن)
-    
-    print("🤖 ربات با موفقیت اجرا شد. (نسخه نهایی با قابلیت لوکیشن‌ها و افزودن لوکیشن توسط ادمین)")
+    register_location_handlers(app)
+
+    print("🤖 ربات با موفقیت اجرا شد. (نسخه کامل: لوکیشن + مدیریت)")
     app.run_polling()
