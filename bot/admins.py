@@ -2,8 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 # لیست شناسه‌های ادمین‌ها
-ADMINS = [6251969541]  # احمد
-ADMINS = [367118717]
+ADMINS = [6251969541,367118717]  # احمد
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMINS
