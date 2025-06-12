@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # پنل مدیریت
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
     
-  # ConversationHandler افزودن لوکیشن
+ # ConversationHandler افزودن لوکیشن
 add_location_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(add_location_start, pattern="^admin_add_location$")],  # ← این خط اصلاح شد
     states={
@@ -82,6 +82,7 @@ add_location_conv = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", add_location_cancel)],
 )
+
 
     # ConversationHandler ویرایش لوکیشن
     edit_location_conv = ConversationHandler(
