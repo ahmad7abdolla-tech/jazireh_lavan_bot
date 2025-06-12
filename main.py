@@ -77,8 +77,7 @@ if __name__ == "__main__":
         entry_points=[
     CallbackQueryHandler(add_location_start, pattern="^admin_add_location$"),
     CommandHandler("addlocation", add_location_start)
-]
-,
+        ]
         states={
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
             PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
