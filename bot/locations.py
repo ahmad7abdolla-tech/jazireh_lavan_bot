@@ -1,16 +1,14 @@
 import json
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, MessageHandler, filters
+from telegram.ext import (
+    ContextTypes, CommandHandler, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
+)
 
 LOCATIONS_FILE = os.path.join(os.path.dirname(__file__), "locations.json")
 
 NAME, PHOTO, DESCRIPTION = range(3)
-
-# مراحل ویرایش (ویرایش نام، عکس، توضیح)
-EDIT_CHOOSE, EDIT_NAME, EDIT_PHOTO, EDIT_DESCRIPTION = range(10, 14)
-
-# مراحل حذف (انتخاب و تایید)
+EDIT_CHOOSE, EDIT_FIELD_CHOOSE, EDIT_NAME, EDIT_PHOTO, EDIT_DESCRIPTION = range(10, 15)
 DELETE_CHOOSE, DELETE_CONFIRM = range(20, 22)
 
 def load_locations():
@@ -23,6 +21,7 @@ def save_locations(locations):
     with open(LOCATIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(locations, f, ensure_ascii=False, indent=2)
 
+# نمایش لوکیشن‌ها به کاربر عادی
 async def handle_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     locations = load_locations()
     if not locations:
@@ -51,12 +50,11 @@ async def show_location_details(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         await query.edit_message_text(text, parse_mode="Markdown")
 
-# --------------- افزودن لوکیشن ---------------
+# --- افزودن لوکیشن ---
 
 async def add_location_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in context.bot_data.get("admins", []):
-        # اجازه افزودن فقط به ادمین‌ها
         await update.message.reply_text("❌ شما دسترسی ادمین ندارید.")
         return ConversationHandler.END
     await update.message.reply_text("لطفاً نام لوکیشن جدید را وارد کنید:")
@@ -81,14 +79,11 @@ async def add_location_photo(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def add_location_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     description = update.message.text.strip()
     context.user_data["new_location"]["description"] = description
-    
     locations = load_locations()
     new_id = str(len(locations) + 1)
     context.user_data["new_location"]["id"] = new_id
-    
     locations.append(context.user_data["new_location"])
     save_locations(locations)
-    
     await update.message.reply_text(f"لوکیشن «{context.user_data['new_location']['name']}» با موفقیت اضافه شد.")
     return ConversationHandler.END
 
@@ -96,18 +91,14 @@ async def add_location_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("عملیات افزودن لوکیشن لغو شد.")
     return ConversationHandler.END
 
-# ------------ ویرایش لوکیشن ------------
+# --- ویرایش لوکیشن ---
 
 async def send_edit_location_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # نمایش لیست لوکیشن‌ها برای ویرایش
     locations = load_locations()
     if not locations:
         await update.callback_query.message.reply_text("فعلاً لوکیشنی برای ویرایش وجود ندارد.")
         return ConversationHandler.END
-    keyboard = [
-        [InlineKeyboardButton(loc["name"], callback_data=f"admin_edit_{loc['id']}")]
-        for loc in locations
-    ]
+    keyboard = [[InlineKeyboardButton(loc["name"], callback_data=f"admin_edit_{loc['id']}")] for loc in locations]
     keyboard.append([InlineKeyboardButton("❌ انصراف", callback_data="admin_edit_cancel")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.edit_text("لوکیشن مورد نظر برای ویرایش را انتخاب کنید:", reply_markup=reply_markup)
@@ -116,14 +107,11 @@ async def send_edit_location_list(update: Update, context: ContextTypes.DEFAULT_
 async def edit_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
-
     if data == "admin_edit_cancel":
         await query.message.edit_text("عملیات ویرایش لغو شد.")
         return ConversationHandler.END
-
     loc_id = data.replace("admin_edit_", "")
     context.user_data["edit_loc_id"] = loc_id
-
     keyboard = [
         [InlineKeyboardButton("✏️ ویرایش نام", callback_data="edit_name")],
         [InlineKeyboardButton("📷 ویرایش عکس", callback_data="edit_photo")],
@@ -132,31 +120,26 @@ async def edit_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.edit_text("کدام بخش را می‌خواهید ویرایش کنید؟", reply_markup=reply_markup)
-    return EDIT_NAME  # مرحله بعد برای انتخاب نوع ویرایش
+    return EDIT_FIELD_CHOOSE
 
 async def edit_field_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
-
     if data == "edit_cancel":
         await query.message.edit_text("عملیات ویرایش لغو شد.")
         return ConversationHandler.END
-
     if data == "edit_name":
         await query.message.edit_text("نام جدید را وارد کنید:")
         return EDIT_NAME
-
     elif data == "edit_photo":
         await query.message.edit_text("عکس جدید را ارسال کنید:")
         return EDIT_PHOTO
-
     elif data == "edit_description":
         await query.message.edit_text("توضیح جدید را وارد کنید:")
         return EDIT_DESCRIPTION
-
     else:
         await query.answer()
-        return EDIT_NAME
+        return EDIT_FIELD_CHOOSE
 
 async def edit_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_name = update.message.text.strip()
@@ -201,17 +184,14 @@ async def edit_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("توضیحات لوکیشن با موفقیت تغییر کرد.")
     return ConversationHandler.END
 
-# ------------- حذف لوکیشن --------------
+# --- حذف لوکیشن ---
 
 async def send_delete_location_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     locations = load_locations()
     if not locations:
         await update.callback_query.message.reply_text("فعلاً لوکیشنی برای حذف وجود ندارد.")
         return ConversationHandler.END
-    keyboard = [
-        [InlineKeyboardButton(loc["name"], callback_data=f"admin_delete_{loc['id']}")]
-        for loc in locations
-    ]
+    keyboard = [[InlineKeyboardButton(loc["name"], callback_data=f"admin_delete_{loc['id']}")] for loc in locations]
     keyboard.append([InlineKeyboardButton("❌ انصراف", callback_data="admin_delete_cancel")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.edit_text("لوکیشن مورد نظر برای حذف را انتخاب کنید:", reply_markup=reply_markup)
@@ -247,3 +227,41 @@ async def delete_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.answer()
         return DELETE_CONFIRM
+
+# تعریف ConversationHandlerها
+
+add_location_conv = ConversationHandler(
+    entry_points=[CommandHandler("add_location", add_location_start)],
+    states={
+        NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
+        PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
+        DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_description)],
+    },
+    fallbacks=[CommandHandler("cancel", add_location_cancel)],
+)
+
+edit_location_conv = ConversationHandler(
+    entry_points=[CallbackQueryHandler(send_edit_location_list, pattern="^admin_edit_start$")],
+    states={
+        EDIT_CHOOSE: [CallbackQueryHandler(edit_choose, pattern="^admin_edit_.*|admin_edit_cancel$")],
+        EDIT_FIELD_CHOOSE: [CallbackQueryHandler(edit_field_choose, pattern="^edit_.*|edit_cancel$")],
+        EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_name)],
+        EDIT_PHOTO: [MessageHandler(filters.PHOTO, edit_photo)],
+        EDIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_description)],
+    },
+    fallbacks=[CommandHandler("cancel", add_location_cancel)],
+)
+
+delete_location_conv = ConversationHandler(
+    entry_points=[CallbackQueryHandler(send_delete_location_list, pattern="^admin_delete_start$")],
+    states={
+        DELETE_CHOOSE: [CallbackQueryHandler(delete_choose, pattern="^admin_delete_.*|admin_delete_cancel$")],
+        DELETE_CONFIRM: [CallbackQueryHandler(delete_confirm, pattern="^delete_confirm_.*$")],
+    },
+    fallbacks=[CommandHandler("cancel", add_location_cancel)],
+)
+
+def register_location_handlers(app):
+    app.add_handler(add_location_conv)
+    app.add_handler(edit_location_conv)
+    app.add_handler(delete_location_conv)
