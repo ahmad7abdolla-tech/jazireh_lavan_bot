@@ -32,11 +32,10 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if data == "admin_add_location":
         await query.answer()
-        await query.message.reply_text("🟢 لطفاً نام لوکیشن جدید را ارسال کنید (یا دستور /addlocation را اجرا کنید).")
+        # هیچ کاری انجام نده چون ConversationHandler خودش فعال میشه
 
     elif data == "admin_edit_location":
         await query.answer()
-        # فراخوانی هندلر نمایش لیست لوکیشن‌ها برای ویرایش
         from bot.locations import send_edit_location_list
         await send_edit_location_list(update, context)
 
@@ -49,4 +48,5 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer()
 
 def register_admin_handlers(app):
+    # اینجا چیزی نیاز نیست چون ConversationHandlerها جدا ثبت میشن
     pass
