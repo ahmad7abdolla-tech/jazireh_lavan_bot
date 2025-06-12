@@ -2,8 +2,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 # لیست آیدی عددی ادمین‌ها
-SUPER_ADMINS = [123456789]  # آیدی ادمین اصلی (توسعه‌دهنده)
-CONTENT_ADMINS = [987654321]  # آیدی ادمین‌های محتوا
+SUPER_ADMINS = [367118717]  # آیدی ادمین اصلی (توسعه‌دهنده)
+CONTENT_ADMINS = [6251969541]  # آیدی ادمین‌های محتوا
 
 # بررسی اینکه آیا کاربر ادمین هست
 def is_admin(user_id: int) -> bool:
