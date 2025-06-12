@@ -16,6 +16,10 @@ from bot.locations import (
 )
 from bot.admins import admin_panel, handle_admin_actions, register_admin_handlers
 
+import os
+if os.path.exists("bot/locations.json"):
+    os.remove("bot/locations.json")
+
 BOT_TOKEN = "7586578372:AAEIkVr4Wq23NSkLuSPRl1yqboqd7_cW0ac"
 
 keyboard = [
