@@ -1,12 +1,9 @@
 import json
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, ConversationHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, MessageHandler, filters
 
 LOCATIONS_FILE = os.path.join(os.path.dirname(__file__), "locations.json")
-
-# مراحل افزودن لوکیشن
-NAME, PHOTO, DESCRIPTION = range(3)
 
 # بارگذاری لوکیشن‌ها از فایل JSON
 def load_locations():
@@ -45,73 +42,67 @@ async def show_location_details(update: Update, context: ContextTypes.DEFAULT_TY
         return
     
     text = f"🏝️ *{loc['name']}*\n\n{loc.get('description', 'بدون توضیح')}"
-    media = []
-    for file_id in loc.get("photos", []):
-        media.append(file_id)
-    # ارسال عکس و متن
+    media = loc.get("photos", [])
     if media:
-        # اگر چند عکس هست، می‌توان از media group استفاده کرد (اختیاری)
+        # ارسال اولین عکس با کپشن (برای ساده‌سازی)
         await query.message.reply_photo(photo=media[0], caption=text, parse_mode="Markdown")
     else:
         await query.edit_message_text(text, parse_mode="Markdown")
 
-# --------------- افزودن لوکیشن توسط ادمین -----------------
-
-async def add_location_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not context.bot_data.get("admins") or user_id not in context.bot_data["admins"]:
-        await update.message.reply_text("شما دسترسی ادمین ندارید.")
-        return ConversationHandler.END
-    await update.message.reply_text("لطفاً نام لوکیشن جدید را وارد کنید:")
-    return NAME
-
-async def add_location_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text.strip()
-    context.user_data["new_location"] = {"name": name}
-    await update.message.reply_text("عکس لوکیشن را ارسال کنید (فقط یک عکس):")
-    return PHOTO
-
-async def add_location_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.photo:
-        await update.message.reply_text("لطفاً یک عکس معتبر ارسال کنید.")
-        return PHOTO
-    photo = update.message.photo[-1]  # بهترین کیفیت عکس
-    file_id = photo.file_id
-    context.user_data["new_location"]["photos"] = [file_id]
-    await update.message.reply_text("توضیح مختصر درباره لوکیشن بنویسید:")
-    return DESCRIPTION
-
-async def add_location_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    description = update.message.text.strip()
-    context.user_data["new_location"]["description"] = description
+# هندلر پیام‌های ادمین برای افزودن لوکیشن مرحله به مرحله
+async def handle_admin_add_location_steps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data = context.user_data
+    state = user_data.get("admin_state")
+    if state not in ("add_name", "add_photo", "add_description"):
+        return False  # به این هندلر مربوط نیست
     
-    # بارگذاری لوکیشن‌های قبلی
-    locations = load_locations()
-    
-    # تولید شناسه جدید (می‌تواند یک رشته یکتا ساده باشد)
-    new_id = str(len(locations) + 1)
-    context.user_data["new_location"]["id"] = new_id
-    
-    # اضافه کردن لوکیشن جدید به لیست
-    locations.append(context.user_data["new_location"])
-    save_locations(locations)
-    
-    await update.message.reply_text(f"لوکیشن «{context.user_data['new_location']['name']}» با موفقیت اضافه شد.")
-    return ConversationHandler.END
+    text = update.message.text if update.message else None
+    photos = update.message.photo if update.message else None
 
-async def add_location_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("عملیات افزودن لوکیشن لغو شد.")
-    return ConversationHandler.END
+    if state == "add_name":
+        if not text:
+            await update.message.reply_text("لطفاً نام معتبر ارسال کنید.")
+            return True
+        user_data["new_location"] = {"name": text.strip()}
+        user_data["admin_state"] = "add_photo"
+        await update.message.reply_text("لطفاً عکس لوکیشن را ارسال کنید (فقط یک عکس).")
+        return True
 
+    elif state == "add_photo":
+        if not photos:
+            await update.message.reply_text("لطفاً یک عکس معتبر ارسال کنید.")
+            return True
+        photo = photos[-1]
+        file_id = photo.file_id
+        user_data["new_location"]["photos"] = [file_id]
+        user_data["admin_state"] = "add_description"
+        await update.message.reply_text("لطفاً توضیح مختصر درباره لوکیشن را ارسال کنید.")
+        return True
+
+    elif state == "add_description":
+        if not text:
+            await update.message.reply_text("لطفاً یک توضیح معتبر ارسال کنید.")
+            return True
+        user_data["new_location"]["description"] = text.strip()
+
+        # ذخیره لوکیشن جدید
+        locations = load_locations()
+        new_id = str(len(locations) + 1)
+        user_data["new_location"]["id"] = new_id
+        locations.append(user_data["new_location"])
+        save_locations(locations)
+
+        await update.message.reply_text(f"لوکیشن «{user_data['new_location']['name']}» با موفقیت اضافه شد.")
+        # پاک کردن وضعیت ادمین و داده موقتی
+        user_data.pop("admin_state", None)
+        user_data.pop("new_location", None)
+        return True
+
+    return False
+
+# ثبت هندلرهای مربوط به لوکیشن‌ها (فقط هندلر نمایش و افزودن مرحله به مرحله)
 def register_location_handlers(app):
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addlocation", add_location_start)],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
-            PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_description)],
-        },
-        fallbacks=[CommandHandler("cancel", add_location_cancel)],
-        allow_reentry=True,
-    )
-    app.add_handler(conv_handler)
+    from telegram.ext import MessageHandler, filters
+
+    # هندلر پیام عمومی برای مراحل ادمین افزودن لوکیشن
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, handle_admin_add_location_steps))
