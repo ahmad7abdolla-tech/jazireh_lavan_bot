@@ -72,19 +72,16 @@ if __name__ == "__main__":
     # پنل مدیریت
     app.add_handler(CallbackQueryHandler(handle_admin_actions, pattern="^admin_"))
     
-    # ConversationHandler افزودن لوکیشن (اصلاح‌شده)
-    add_location_conv = ConversationHandler(
-        entry_points=[
-    CallbackQueryHandler(add_location_start, pattern="^admin_add_location$"),
-    CommandHandler("addlocation", add_location_start)
-        ],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
-            PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_description)],
-        },
-        fallbacks=[CommandHandler("cancel", add_location_cancel)],
-    )
+  # ConversationHandler افزودن لوکیشن
+add_location_conv = ConversationHandler(
+    entry_points=[CallbackQueryHandler(add_location_start, pattern="^admin_add_location$")],  # ← این خط اصلاح شد
+    states={
+        NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_name)],
+        PHOTO: [MessageHandler(filters.PHOTO, add_location_photo)],
+        DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_location_description)],
+    },
+    fallbacks=[CommandHandler("cancel", add_location_cancel)],
+)
 
     # ConversationHandler ویرایش لوکیشن
     edit_location_conv = ConversationHandler(
